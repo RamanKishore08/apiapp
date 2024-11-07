@@ -4,29 +4,23 @@ import pdfplumber
 import os
 
 app = Flask(__name__)
-CORS(app)  
+CORS(app)
 
 # Function to check if the PDF is a resume based on keywords
 def is_resume(text):
-    required_keywords = ["education", "experience", "skills", "summary", "projects", "certifications", "awards", "languages", "contact"]
+    required_keywords = ["education", "experience", "skills", "summary", "projects", "certifications", "awards", 
+                         "languages", "contact", "qualification", "internships", "work experience", "certificates", 
+                         "courses completed", "achievements", "volunteering", "languages known", "contact me"]
     return any(keyword in text.lower() for keyword in required_keywords)
 
 # Function to analyze grammatical errors (placeholder function)
 def analyze_grammar(text):
-    
     errors = len(text.split()) // 100
     if errors > 3:
         return "There are some grammatical errors in your resume.", errors
     return "", errors
 
-# Function to check if the PDF is a resume based on keywords
-def is_resume(text):
-    required_keywords = ["education", "experience", "skills", "summary", "projects", "certifications", "awards", "languages", "contact", 
-                         "qualification", "internships", "work experience", "certificates", "courses completed", "achievements", 
-                         "volunteering", "languages known", "contact me"]
-    return any(keyword in text.lower() for keyword in required_keywords)
-
-# Modified analyze_resume function with updated conditions
+# Function to analyze the resume and return score and suggestions
 def analyze_resume(text):
     score = 0
     suggestions = []
@@ -38,7 +32,7 @@ def analyze_resume(text):
         suggestions.append({"suggestion": "Add an Education or Qualification section", "priority": 1})
 
     # Experience or Internships or Work Experience section
-    if any(word in text.lower() for word in ["experience", "internship", "internships","work experience"]):
+    if any(word in text.lower() for word in ["experience", "internship", "internships", "work experience"]):
         score += 25
     else:
         suggestions.append({"suggestion": "Add a Work Experience or Internships", "priority": 1})
@@ -56,7 +50,7 @@ def analyze_resume(text):
     else:
         suggestions.append({"suggestion": "Mention relevant projects", "priority": 2})
 
-    # Certifications or Certificates or Courses Completed section
+    # Certifications or Courses Completed section
     if any(word in text.lower() for word in ["certification", "certificates", "courses completed"]):
         score += 8
     else:
@@ -68,13 +62,13 @@ def analyze_resume(text):
     else:
         suggestions.append({"suggestion": "Include any awards, achievements, or volunteering experience", "priority": 3})
 
-    # Languages or Languages Known section                                   
+    # Languages section                                   
     if any(word in text.lower() for word in ["languages", "languages known"]):
         score += 6
     else:
         suggestions.append({"suggestion": "Mention languages you are proficient in", "priority": 3})
 
-    # Contact Information or Contact Me section
+    # Contact Information section
     if any(word in text.lower() for word in ["contact", "contact me", "phone", "email"]):
         score += 7
     else:
@@ -99,7 +93,7 @@ def analyze_resume(text):
     return score, suggestions
 
 
-# New route to check individual resume and return the score
+# Route to check individual resume and return the score
 @app.route("/score", methods=["POST"])
 def check_resume():
     if "resume" not in request.files:
@@ -109,6 +103,7 @@ def check_resume():
     file_path = os.path.join("uploads", resume.filename)
 
     try:
+        os.makedirs("uploads", exist_ok=True)
         resume.save(file_path)
 
         # Extract text from the resume using pdfplumber
@@ -129,9 +124,9 @@ def check_resume():
         return jsonify({"error": "Error processing resume."}), 500
 
     finally:
-        # Clean up uploaded file
         if os.path.exists(file_path):
             os.remove(file_path)
+
 
 # Route to handle multiple resumes and return the best 5
 @app.route("/best5", methods=["POST"])
@@ -146,6 +141,7 @@ def best_5_resumes():
         file_path = os.path.join("uploads", resume.filename)
 
         try:
+            os.makedirs("uploads", exist_ok=True)
             resume.save(file_path)
 
             # Extract text from the resume using pdfplumber
@@ -160,7 +156,7 @@ def best_5_resumes():
 
             # Get score and suggestions
             score, suggestions = analyze_resume(text)
-            scored_resumes.append({"filename": resume.filename, "score": score, "suggestions": suggestions})
+            scored_resumes.append({"filename": resume.filename, "score": score, "suggestions": [s["suggestion"] for s in suggestions]})
 
         except Exception as e:
             continue
@@ -172,7 +168,6 @@ def best_5_resumes():
     best_resumes = sorted(scored_resumes, key=lambda x: x["score"], reverse=True)[:5]
     return jsonify({"best_resumes": best_resumes})
 
+
 if __name__ == "__main__":
-    if not os.path.exists("uploads"):
-        os.makedirs("uploads")
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
